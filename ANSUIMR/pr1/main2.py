@@ -157,12 +157,12 @@ def main():
         timer.tick(fps)
         t+=dt
         if t>10:
-            run_id+=1
-            reset(run_id)
             t=0
-            with open("log.txt", "a") as f: f.write(f"{run_id} {Q}\n")            
+            with open("log.txt", "a") as f: f.write(f"{run_id} {Q}\n") 
+            run_id+=1           
             if run_id>=len(variants):
-                break
+                break            
+            reset(run_id) 
             
             
 
@@ -172,5 +172,6 @@ def main():
 
 
 main()
+
 
 #template file by S. Diane, RTU MIREA, 2024
