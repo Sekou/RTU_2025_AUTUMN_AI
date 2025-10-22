@@ -69,6 +69,7 @@ class Lidar:
         self.ang=0
         self.L=200
         self.pp=[]
+        self.vals=[]
     def draw(self, screen):
         p1=(self.x, self.y)
         p2=np.array(p1)+ (10*math.cos(self.ang), 10*math.sin(self.ang))
@@ -84,6 +85,7 @@ class Lidar:
             p1=(self.x, self.y)
             dang=2*math.pi/self.nrays
             pp=[]
+            self.vals=[self.L]*self.nrays
             for i in range(self.nrays):
                 buffer=[]
                 for ln in lines:
@@ -95,6 +97,7 @@ class Lidar:
                 if len(buffer):
                     dd=[dist(p, p1) for p in buffer]
                     pp.append(buffer[np.argmin(dd)])
+                    self.vals[i]=dist(buffer[np.argmin(dd)], p1)
 
             self.pp=pp
 
@@ -108,6 +111,7 @@ class Robot:
         self.speed=0
         self.steer=0
         self.traj=[] #точки траектории
+        self.control_log=[] #журнал управления
         self.lidar=Lidar(10)
         
     def getPos(self):
@@ -135,11 +139,14 @@ class Robot:
 
         self.lidar.draw(screen)
 
-    def sim(self, dt, lines):
+    def sim(self, dt, lines, time):
         self.lidar.x=self.x
         self.lidar.y=self.y
         self.lidar.ang=self.alpha
         self.lidar.sim(dt, lines)
+        str_lidar=" ".join([f"{int(v)}" for v in self.lidar.vals])
+
+        self.control_log.append(f"{time:.3f} {self.x:.0f} {self.y:.0f} {self.alpha:.2f} {str_lidar}")
 
         self.addedTrajPt = False
         delta=[self.speed*dt, 0]
@@ -196,23 +203,35 @@ if __name__=="__main__":
     make_obstacle(500,90)
 
     time=0
-    goal = [400,200]
+    #goal = [400,200]
 
     while True:
         for ev in pygame.event.get():
             if ev.type==pygame.QUIT:
                 sys.exit(0)
+            if ev.type==pygame.KEYDOWN:
+                if ev.key==pygame.K_e: robot.speed=50
+                if ev.key==pygame.K_w: robot.speed=20
+                if ev.key==pygame.K_s: robot.speed=-20
+                if ev.key==pygame.K_a: robot.steer=-0.5
+                if ev.key==pygame.K_d: robot.steer=+0.5
+                if ev.key==pygame.K_z: robot.speed=robot.steer=0
+                if ev.key==pygame.K_r: robot=Robot(100, 150, 0)
+                if ev.key==pygame.K_1: 
+                    with open("log.txt", "w") as f:
+                        f.write("\n".join(robot.control_log))
+
         dt=1/fps
         screen.fill((255, 255, 255))
 
-        robot.goto(goal, dt)
+        #robot.goto(goal, dt)
 
-        robot.sim(dt, lines)
+        robot.sim(dt, lines, time)
 
         robot.draw(screen)
         for ln in lines: ln.draw(screen)
         
-        pygame.draw.circle(screen, (255,0,0), goal, 5, 2)
+        #pygame.draw.circle(screen, (255,0,0), goal, 5, 2)
 
         drawText(screen, f"Time = {time:.3f}", 5, 5)
        
