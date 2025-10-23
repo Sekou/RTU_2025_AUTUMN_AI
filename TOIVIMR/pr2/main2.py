@@ -3,7 +3,7 @@ import numpy as np
 import math
 
 pygame.font.init()
-def draw_text(screen, s, x, y, sz=20, с=(255, 255, 255)):  # отрисовка текста
+def draw_text(screen, s, x, y, sz=20, с=(100, 200, 100)):  # отрисовка текста
     screen.blit(pygame.font.SysFont('Comic Sans MS', sz).render(s, True, с), (x, y))
 
 def rot(v, ang): #поворот вектора на угол
@@ -23,8 +23,9 @@ def dist(p1, p2): #расстояние между точками
 
 def draw_hist(screen, arr, x, y, w, h):
     y_,hmax,c = y+h, max(arr), (255,0,0)
-    for i in range(len(arr)): pygame.draw.line(screen, c, (x+i*5, y_), (x+i*5, y_-arr[i]*h/hmax), 4)
-    pygame.draw.rect(screen, c, (x, y, w, h), 1)
+    k=1/hmax if hmax>0 else 0
+    for i in range(len(arr)): pygame.draw.line(screen, c, (x+i*5, y_), (x+i*5, y_-arr[i]*h*k), 4)
+    #pygame.draw.rect(screen, c, (x, y, w, h), 1)
 
 def draw_rot_rect(screen, color, pc, w, h, ang): #точка центра, ширина, высота и угол поворота прямогуольника
     pts = [
@@ -61,16 +62,18 @@ class Frame:
                          (self.x0, self.y0, self.w, self.h), 2)
     def calc_brightness(self, img):
         self.brightness=0
-        for iy in range(self.h):
-            for ix in range(self.w):
+        iw,ih=img.shape[1],img.shape[0]
+        for iy in range(min(self.h, ih-self.y0)):
+            for ix in range(min(self.w, iw-self.x0)):
                 self.brightness+=\
                     np.mean(img[self.y0+iy,self.x0+ix,:])
         self.brightness/=(self.w*self.h*255*3)
         return self.brightness
     def calc_contrast(self, img):
         vv=[]
-        for iy in range(self.h):
-            for ix in range(self.w):
+        iw,ih=img.shape[1],img.shape[0]
+        for iy in range(min(self.h, ih-self.y0)):
+            for ix in range(min(self.w, iw-self.x0)):
                 vv.append(np.mean(img[self.y0+iy,self.x0+ix,:]))
         vv=sorted(vv)
         a, b, avg=np.mean(vv[:200]), np.mean(vv[-200:]), np.mean(vv)
@@ -79,20 +82,35 @@ class Frame:
         self.contrast=(c1+c2)/2
         return self.contrast
     def calc_histogramm(self, img, nbins=10):
-        img2=rgb2gray(img)
-        img3=img2[self.y0:self.y0+self.h, self.x0:self.x0+self.w]
+        img2=rgb2gray(img) if len(img.shape)==3 else img
+        iw,ih=img.shape[1],img.shape[0]
+        img3=img2[self.y0:min(self.y0+self.h,ih), self.x0:min(self.x0+self.w, ih)]
+        if self.x0>=iw or self.y0>=ih: return None
         vmax = img3.max(axis=(0, 1))
         res=np.zeros(nbins)
         thresholds = list(np.arange(0, vmax, vmax/nbins))+[vmax]
-        for iy in range(self.h):
-            for ix in range(self.w):
+        iw,ih=img.shape[1],img.shape[0]
+        for iy in range(min(self.h, ih-self.y0)):
+            for ix in range(min(self.w, iw-self.x0)):
                 v=img3[iy, ix]
+                #if v<5: 
+                   # print(ix, iy)
                 for j in range(len(thresholds)-1):
                     if thresholds[j]<=v<thresholds[j+1]:
                         res[j]+=1
                         break
         self.histogramm=res
         return res
+
+def search(etalon, image, thresh, dx, dy, margin):
+    res=[]
+    for y in range(0,image.shape[0]-margin, dx):
+        for x in range(0,image.shape[1]-margin, dy):
+            frame=Frame(x, y, 45, 45)
+            h=frame.calc_histogramm(image, 10)
+            error=compare(etalon, h)
+            if error<thresh: res.append([x,y])
+    return res
         
 def main():
     screen = pygame.display.set_mode(sz)
@@ -103,11 +121,14 @@ def main():
 
     surf = pygame.image.load('img.jpg')
     img = pygame.surfarray.array3d(surf)
-    img_rect = surf.get_rect(bottomright=(W, H))
+    img_gray=rgb2gray(img)
+    img_rect = surf.get_rect(topleft=(0, 0))
 
     frame=Frame(100, 100, 45, 45)
 
     etalon=None
+    locations=[]
+
     while True:
         for ev in pygame.event.get():
             if ev.type==pygame.QUIT:
@@ -118,6 +139,8 @@ def main():
                 if ev.key == pygame.K_s: frame.y0+=5
                 if ev.key == pygame.K_d: frame.x0+=5
                 if ev.key == pygame.K_e: etalon=frame.calc_histogramm(img, 10)
+                if ev.key == pygame.K_1:
+                    locations=search(etalon, img_gray, 300, 20, 20, 45)
             if ev.type == pygame.MOUSEBUTTONDOWN:
                 frame.x0=ev.pos[0]
                 frame.y0=ev.pos[1]
@@ -129,20 +152,28 @@ def main():
         frame.calc_brightness(img)
         frame.calc_contrast(img)
 
-        screen.fill((255, 255, 255))
+        screen.fill((200, 200, 200))
 
         screen.blit(surf, img_rect)
 
         frame.draw(screen)
 
+        for l in locations:            
+            pygame.draw.rect(screen, (255,155,0), [*l, 45, 45], 2)
+
         draw_text(screen, f"W*H = {W}*{H}", 5, 5)
         draw_text(screen, f"Brightness = {frame.brightness:.2f}", 5, 25)
         draw_text(screen, f"Contrast = {frame.contrast:.2f}", 5, 45)
+        draw_text(screen, f"X, Y = {frame.x0:.0f}, {frame.y0:.0f}", 5, 65)
         
         if frame.histogramm is not None:
             str_hist=arr_to_str(frame.histogramm)
-            draw_text(screen, f"Hist = {str_hist}", 5, 560)
+            draw_text(screen, f"Current Hist. = {str_hist}", 5, 560)
             draw_hist(screen, frame.histogramm, frame.x0, frame.y0, frame.w, frame.h)
+
+        if etalon is not None:
+            str_hist=arr_to_str(etalon)
+            draw_text(screen, f"Etalon Hist. = {str_hist}", 5, 580)
 
         pygame.display.flip()
         timer.tick(fps)
