@@ -182,6 +182,9 @@ if __name__=="__main__":
 
     lines=[]
 
+    MODE="manual"
+    #MODE="neural"
+
     def make_border():
         ln=Line(False)
         ln.add_pt((50,50))
@@ -205,6 +208,8 @@ if __name__=="__main__":
     time=0
     #goal = [400,200]
 
+    model=None
+
     while True:
         for ev in pygame.event.get():
             if ev.type==pygame.QUIT:
@@ -220,11 +225,21 @@ if __name__=="__main__":
                 if ev.key==pygame.K_1: 
                     with open("log.txt", "w") as f:
                         f.write("\n".join(robot.control_log))
+                if ev.key==pygame.K_n: 
+                    MODE="neural"
+                    from net import createModel
+                    model=createModel()
+                    model.load_weights("net.weights.h5")
 
         dt=1/fps
         screen.fill((255, 255, 255))
 
         #robot.goto(goal, dt)
+
+        if model:
+            vec=[robot.x, robot.y, robot.alpha]+robot.lidar.vals
+            result=model.predict(np.array([vec]))
+            print(result)
 
         robot.sim(dt, lines, time)
 

@@ -38,12 +38,16 @@ def trainNet():
     #Y_val=[[1.2], [2.4], [3.6]]
 
     losses = model.fit(X_train, Y_train,
-                       validation_data=(X_train, X_train),
+                       validation_data=(X_train, Y_train),
                        batch_size=1,
                        epochs=15)
 
-    result=model.predict(np.array([[0.4, 0.4, 0.4]]))
+    result=model.predict(np.array([
+        [263, 150, 0.00, 200, 200, 200, 200, 200, 200, 68, 74, 105, 119]]))
     print(result)
+
+    model.save_weights("net.weights.h5")
 
 if __name__=="__main__":
     trainNet()
+    
