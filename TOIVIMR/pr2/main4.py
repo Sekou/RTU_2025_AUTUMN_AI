@@ -32,7 +32,7 @@ def gauss_mask(x=0, y=0, mx=0, my=0, sx=1, sy=1):
     return np.exp(-0.5*(((x - mx)/sx)**2 + ((y - my)/sy)**2))
 
 frw,frh=45,45
-GAUSS_MASK=[[gauss_mask(ix, iy, frw/2, frh/2, frw/2, frh/2) for ix in range(w)] for iy in range(h)]
+GAUSS_MASK=[[gauss_mask(ix, iy, frw/2, frh/2, frw/2, frh/2) for ix in range(frw)] for iy in range(frh)]
 
 class Frame:
     def __init__(self, x0, y0, w, h):
@@ -167,5 +167,6 @@ def main():
         timer.tick(fps)
 
 main()
+
 
 #template file by S. Diane, RTU MIREA, 2024
