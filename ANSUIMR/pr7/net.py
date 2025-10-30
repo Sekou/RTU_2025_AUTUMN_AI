@@ -1,5 +1,14 @@
 #2024, S. Diane, tensorflow/keras neural network example
 
+
+#для парковки в нейросеть подается:
+# поперечное отклонение автомобиля от обочины, угол поворота корпуса,
+# значения 20 дальностей лидара с прошлого шага времени
+# значения 20 дальностей лидара с текущего шага времени
+
+# нейросеть обучается на нормализованных данных в течение 100 эпох
+
+
 import tensorflow as tf
 import numpy as np
 
@@ -7,7 +16,7 @@ def createModel():
     model = tf.keras.Sequential([
 
         tf.keras.layers.Dense(units=64, activation='relu',
-                              input_shape=[13]),
+                              input_shape=[42]),
         tf.keras.layers.Dense(units=64, activation='relu'),
         tf.keras.layers.Dense(units=2)#, activation=tf.nn.softmax
     ])
@@ -22,14 +31,19 @@ def trainNet():
 
     X_train=[]
     Y_train=[]
-    with open("log_parking.txt") as f:
+    with open("log.txt") as f:
         lines=f.readlines()
+
+        prev_lidars=[]
         for l in lines:
             tokens=l.split()
-            inps=[float(v) for v in tokens[3:]] #x y alpha + lidar
+            lidars=[float(v)/100 for v in tokens[6:]] 
+            if len(prev_lidars)==0: prev_lidars=lidars
+            inps=[float(tokens[4])/10, float(tokens[5])] + prev_lidars + lidars #y alpha + lidar #координата x не нужна
             outs=[float(v) for v in tokens[1:3]] #vx vang
             X_train.append(inps)
             Y_train.append(outs)
+            prev_lidars=lidars
 
 
     #X_train=[[0,0,0], [0.5, 0.5, 0.5], [1, 1, 1]]
@@ -40,11 +54,11 @@ def trainNet():
     losses = model.fit(X_train, Y_train,
                        validation_data=(X_train, Y_train),
                        batch_size=1,
-                       epochs=15)
+                       epochs=100)
 
-    result=model.predict(np.array([
-        [263, 150, 0.00, 200, 200, 200, 200, 200, 200, 68, 74, 105, 119]]))
-    print(result)
+    #result=model.predict(np.array([
+        #[150, 0.00, 200, 200, 200, 200, 200, 200, 68, 74, 105, 119]]))
+    #print(result)
 
     model.save_weights("net.weights.h5")
 
