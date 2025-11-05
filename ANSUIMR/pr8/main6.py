@@ -183,99 +183,61 @@ class Robot:
 
 SIM_RATE=10
 
+def run_experiment(traj, kp, ki, kd, max_time, dt):
+    robot=Robot(100, 320, 0.5)
+    robot.kp, robot.ki, robot.kd = kp, ki, kd
+    time=0
+    errors = []
+    ind_pt=0 #индекс целевой точки, в которую едет робот
+    running = True
+    while running:
+        if running:
+            goal=traj.pts[ind_pt]
+            robot.goto(goal, dt)
+            robot.sim(time, dt)
+            d_pt = dist(robot.get_pos(), goal)
+
+            if d_pt<100:
+                ind_pt+=1
+                if ind_pt>=len(traj.pts):
+                    running=False
+                    robot.speed=0
+                    break
+            
+            i1, i2=ind_pt-1, ind_pt
+            if i1<0: i1, i2=i1+1, i2+1
+            if i2>=len(traj.pts): i1, i2=i1-1, i2-1
+
+            segm=[traj.pts[i1], traj.pts[i2]]
+            p_=project_pt(segm, robot.get_pos())
+            e=dist(p_, robot.get_pos())
+            errors.append(e)
+
+            time+=dt
+            if time>max_time:
+                running=False
+    return robot.get_traj_len(), np.mean(errors)
+
 if __name__=="__main__":
     screen = pygame.display.set_mode(sz)
     timer = pygame.time.Clock()
     fps = 20
-
-    #robot=Robot(100, 320, 0.5)
-    #robot.kp=0.3
-
-    rr=[Robot(100, 200, 0.5) for i in range(10)]
-    for i,r in enumerate(rr): 
-        r.kp=0.01+0.05*i
-
-    #rr=[Robot(100, 200, 0.5) for i in range(1)]
-    #rr[0].kp=0.06 # получено путем визуального выбора из семейства траекторий
-    robot=rr[0]
-
-    #robot.kp, robot.kd, robot.ki=find_Zigler_Nichols_koeffs(10, 0.06)
-    #print(f"ZN: kp={robot.kp:.3f}, kd={robot.kd:.3f}, ki={robot.ki:.3f}")
-
-    #robot.kp, robot.kd, robot.ki=find_KPU_koeffs(10, 0.06)
-    #print(f"KPU: kp={robot.kp:.3f}, kd={robot.kd:.3f}, ki={robot.ki:.3f}")
-
+    dt=1/fps
 
     pts=[[200, 400], [750, 400]]
     traj = TargetTrajectory(pts)
 
-    time=0
-    goal = [600,400]
-    errors = []
+    params=[
+[1,1,1],
+[2,2,2],
+[3,3,3],
+[4,4,4]
+    ]
 
-    ind_pt=1 #индекс целевой точки, в которую едет робот
+#TODO: сделать не просто цикл, а направленный цикл поиска по методу покоординатного спуска
+    for P in params:
+        L, E = run_experiment(traj, *P, 10, 0.05)
+        print(f"P={P}; L={L}, E={E}")
 
-    running=True
-    while True:
-        for ev in pygame.event.get():
-            if ev.type==pygame.QUIT:
-                sys.exit(0)
-        dt=1/fps
-
-        for iter in range(SIM_RATE):
-            if running:
-                goal=traj.pts[ind_pt]
-                #robot.goto(goal, dt)
-                #robot.sim(time, dt)
-
-                for r in rr: 
-                    r.goto(goal, dt)
-                    r.sim(time, dt)
-
-                d_pt = dist(robot.get_pos(), goal)
-
-                if d_pt<100:
-                    ind_pt+=1
-                    if ind_pt>=len(traj.pts):
-                        running=False
-                        robot.speed=0
-                        break
-                
-                i1, i2=ind_pt-1, ind_pt
-                if i1<0: i1, i2=i1+1, i2+1
-                if i2>=len(traj.pts): i1, i2=i1-1, i2-1
-
-                segm=[traj.pts[i1], traj.pts[i2]]
-                p_=project_pt(segm, robot.get_pos())
-                e=dist(p_, robot.get_pos())
-                errors.append(e)
-
-                time+=dt
-            
-
-        screen.fill((255, 255, 255))
-        #robot.draw(screen)
-        traj.draw(screen)
-
-        for r in rr: r.draw(screen)
-
-        
-        pygame.draw.line(screen, (255,0,255), robot.get_pos(), p_, 2)
-        pygame.draw.circle(screen, (255,0,255), p_, 5, 2)
-        pygame.draw.circle(screen, (255,0,0), goal, 5, 2)
-
-        pp=find_intersections(traj.pts, robot.traj, robot.traj_times)
-        T=find_oscillation_period(pp)
-        for p, t in pp:
-            pygame.draw.circle(screen, (70,100,200), p, 5, 2)
-
-        drawText(screen, f"Time = {time:.2f}", 5, 5)
-        drawText(screen, f"Traj Len Desired = {traj.get_traj_len():.0f}", 5, 25)
-        drawText(screen, f"Traj Len Real= {robot.get_traj_len():.0f}", 5, 45)
-        drawText(screen, f"Error Avg = {np.mean(errors):.0f}", 5, 65)
-        drawText(screen, f"Oscill. Period = {T:.2f}", 5, 85)
-       
-        pygame.display.flip()
-        timer.tick(fps)
 
 #template file by S. Diane, RTU MIREA, 2024
