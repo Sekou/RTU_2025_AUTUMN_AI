@@ -128,11 +128,11 @@ class Robot:
         v=np.subtract(pos, self.getPos())
         aGoal=math.atan2(v[1], v[0])
         da=limAng(aGoal-self.alpha)
-        self.steer += 0.5 * da * dt
+        self.steer += 0.5 * da * dt # steer=f1(t)
         maxSteer=1
         if self.steer > maxSteer: self.steer = maxSteer
         if self.steer < -maxSteer: self.steer = -maxSteer
-        self.speed = 10
+        self.speed = 10 # speed=f2(t)
 
 if __name__=="__main__":
     screen = pygame.display.set_mode(sz)
