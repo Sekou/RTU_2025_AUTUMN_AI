@@ -56,7 +56,8 @@ class Ball:
     def get_pos(self):
         return [self.x, self.y]
     def draw(self, screen):
-        pygame.draw.circle(screen, self.color, self.get_pos(), self.radius, 2)
+        pygame.draw.circle(screen, self.color, 
+        self.get_pos(), self.radius+self.z/3, 2)
     def sim(self, dt):
         s,c=math.sin(self.a), math.cos(self.a)
         if self.z>1:
