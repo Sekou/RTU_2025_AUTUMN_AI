@@ -24,6 +24,17 @@ def rotArr(vv, ang): # функция для поворота массива н�
 def dist(p1, p2): #расстояние между точками
     return np.linalg.norm(np.subtract(p1, p2))
 
+
+# проверяем, находится ли точка внутри многоугольника
+def pt_inside_ngon(point, vertices):
+    (x, y), c = point, 0
+    for i in range(len(vertices)):
+        (x1, y1), (x2, y2) = vertices[i-1], vertices[i]
+        if min(y1,y2) <= y < max(y1, y2):
+            ratio = (y - y1) / (y2 - y1)
+            c ^= (x - x1 < ratio*(x2 - x1))
+    return c
+
 class Tree:
     def __init__(self, x, y):
         self.x, self.y = x, y
@@ -89,10 +100,11 @@ sz = (800, 600)
 
 class Robot:
     def __init__(self, x, y):
-        self.radius=20
+        self.radius=15
         self.color=(0,0,0)
         self.x, self.y, self.a=x,y,0
         self.vlin, self.vrot=0,0
+        self.fov = [[0,0], [150,70], [150,-70]]
     def get_pos(self):
         return [self.x, self.y]
     def draw(self, screen):
@@ -100,6 +112,19 @@ class Robot:
         pygame.draw.circle(screen, self.color, p1, self.radius, 2)
         s,c=math.sin(self.a), math.cos(self.a)
         pygame.draw.line(screen, self.color, p1, p1+[self.radius*c, self.radius*s],2)
+        pp=self.get_rotated_fov()
+        for i in range(len(pp)):
+            pygame.draw.line(screen, (0,255,0), pp[i-1], pp[i], 2)
+    def get_rotated_fov(self):
+        return [np.add(self.get_pos(), rot(p, self.a)) for p in self.fov]
+    def detect(self, objs):
+        pp=self.get_rotated_fov()
+        for o in objs:
+            if pt_inside_ngon(o.get_pos(), pp):
+                if type(o)==Tree: return "fir"
+                if type(o)==Tree2: return "oak"
+                if type(o)==Tree3: return "birch"
+        return "empty"
     def sim(self, dt):
         s,c=math.sin(self.a), math.cos(self.a)
         self.x+=c*self.vlin*dt
@@ -111,6 +136,8 @@ def main():
     timer = pygame.time.Clock()
     fps = 20
     robot = Robot(200, 200)
+
+    detection_time=1*fps
 
     trees=[
         Tree(300,100),
@@ -124,6 +151,8 @@ def main():
         Tree3(100,380),
     ]
 
+    detection_history=""
+    t_ind=0
 
     while True:
         for ev in pygame.event.get():
@@ -134,9 +163,17 @@ def main():
                 if ev.key == pygame.K_s: robot.vlin=-50
                 if ev.key == pygame.K_a: robot.vrot=-1
                 if ev.key == pygame.K_d: robot.vrot=+1
+                if ev.key == pygame.K_1: 
+                    with open("detection_history.txt", "w") as f:
+                        f.write(detection_history)
 
         dt=1/fps
         robot.sim(dt)
+        if t_ind%detection_time==0:
+            detection=robot.detect(trees)
+            print(detection)
+            detection_history+=detection+" "
+
         screen.fill((255, 255, 255))
         for tree in trees:
             tree.draw(screen)
@@ -146,6 +183,7 @@ def main():
 
         pygame.display.flip()
         timer.tick(fps)
+        t_ind+=1
 
 main()
 
