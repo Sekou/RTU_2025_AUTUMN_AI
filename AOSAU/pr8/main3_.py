@@ -165,8 +165,12 @@ def main():
                         #проверить достигают ли роботы такого удаления?
                         if dist(r.get_pos(), (r.x0, r.y0))>2: 
                            r.goto_pos((r.x0, r.y0), dt) 
-                    elif r!=robot: r.stop()
-                else: r.stop()
+                    elif r!=robot: 
+                        print("stop 1")
+                        r.stop()
+                else: 
+                    print("stop 2")
+                    r.stop()
         ball.sim(dt)
 
         catch=ball_is_near_player(ball, robots)
@@ -178,11 +182,14 @@ def main():
                 score1+=1
                 last_loose=2
 
-        for o in [robot,ball]: show_color(o, vc)
+        for o in [robot, ball]: show_color(o, vc)
 
         screen.fill((255, 255, 255))
         vc.draw(screen)
-        for r in robots: r.draw(screen)
+        for r in robots: 
+            r.draw(screen)
+            if r==robot:
+                pygame.draw.circle(screen, (0,0,0), r.get_pos(), 3, 2)
         ball.draw(screen)
         drawText(screen, f"Index = {ind_robot};"+ 
         f"Score1 = {score1}; Score2 = {score2}", 5, 5)
