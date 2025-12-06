@@ -32,8 +32,9 @@ def main():
     def get_contour(pts_sorted, sign):
         c=[]
         for i in range(len(c), len(pts_sorted)):
+            #убеждамся, что предыдущие точки совместимы с новой (образуют выпуклый контур)
             while len(c)>=2 and bend_sign(c[-2], c[-1], pts_sorted[i])*sign>0: c.pop()
-            c.append(pts_sorted[i])
+            c.append(pts_sorted[i]) #добавляем точку
         return c
 
     contour=[]
