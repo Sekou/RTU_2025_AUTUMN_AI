@@ -22,22 +22,19 @@ def main():
     pts_sorted=sorted(pts)
 
     def bend_sign(p1, p2, p3):
-        v1, v2=np.subtract(p2, p1), np.subtract(p3, p2)
-        return np.linalg.norm(np.cross(v1, v2))
+        v1, v2 = np.subtract(p2+[0], p1+[0]), np.subtract(p3+[0], p2+[0])
+        return np.cross(v1, v2)[2] #np.cross(v1, v2)@[0,0,1]
 
     def add_node(pts_sorted, contour):
         i = len(contour)
         contour.append(pts_sorted[i])
 
-    def add_node_smart(pts_sorted, contour):
-        for i in range(len(contour), len(pts_sorted)):
-            if len(contour)<3: sign0=0
-            else: sign0=bend_sign(contour[-3], contour[-2], contour[-1])
-            sign1=bend_sign(contour[-2], contour[-1], pts_sorted[i])
-            if sign0*sign1>=0:
-                contour.append(pts_sorted[i])
-                return
-            i+=1
+    def get_contour(pts_sorted, sign):
+        c=[]
+        for i in range(len(c), len(pts_sorted)):
+            while len(c)>=2 and bend_sign(c[-2], c[-1], pts_sorted[i])*sign>0: c.pop()
+            c.append(pts_sorted[i])
+        return c
 
     contour=[]
     
@@ -45,20 +42,22 @@ def main():
         for ev in pygame.event.get():
             if ev.type==pygame.QUIT: sys.exit(0)
             if ev.type == pygame.KEYDOWN:
-                if ev.key == pygame.K_1: 
+                if ev.key == pygame.K_1:
                     if len(contour)<len(pts_sorted):
                         add_node(pts_sorted, contour)
-                if ev.key == pygame.K_2: 
-                    if len(contour)<len(pts_sorted):
-                        add_node_smart(pts_sorted, contour)
+                if ev.key == pygame.K_2:
+                    c1=get_contour(pts_sorted, -1)
+                    c2=get_contour(pts_sorted, 1)
+                    contour=c1[1:-1]+c2[-1::-1]
 
-        screen.fill((255, 255, 255))     
+        screen.fill((255, 255, 255))
         for p in pts:
             pygame.draw.circle(screen, (0,0,0), p, 3, 2)
         
         if len(contour)>1:
-            pygame.draw.polygon(screen, (0,0,200), contour, 2)
-        
+            pygame.draw.lines(screen, (0,0,200), False, contour, 2)
+            pygame.draw.line(screen, (200,200,200), contour[0], contour[-1], 1)
+
         for i in range(len(contour)):
             p1, p2, p3=contour[i-1], contour[i], contour[(i+1)%len(contour)]
             c = (0,255,0) if bend_sign(p1, p2, p3)>0 else (255,0,0)
