@@ -135,18 +135,20 @@ def main():
             if ev.type==pygame.QUIT:
                 sys.exit(0)
             if ev.type == pygame.KEYDOWN:
+                mode="MANUAL" #2025-12-10 чтоб не путать ручной режим с автоматическим
                 if ev.key == pygame.K_w: robot.vlin=50
                 if ev.key == pygame.K_s: robot.vlin=-50
                 if ev.key == pygame.K_a: robot.vrot=-1
                 if ev.key == pygame.K_d: robot.vrot=+1
                 if ev.key == pygame.K_z: robot.stop()
-                if ev.key == pygame.K_SPACE: 
+                if ev.key == pygame.K_SPACE:
                     if robot.attached_obj:
                         robot.attached_obj.vlin=50
                         robot.attached_obj.vz=20
                         robot.attached_obj.a=robot.a
                         robot.attached_obj=None
                         game_started=True
+                    mode = "AUTO"
                 if ev.key == pygame.K_t: 
                     if dist(robot.get_pos(), ball.get_pos())<robot.radius*1.5:
                         robot.attached_obj=ball
@@ -159,7 +161,7 @@ def main():
             if not r.attached_obj:
                 A = contains(r, vc.get_bb1()) and contains(ball, vc.get_bb1()) 
                 B = contains(r, vc.get_bb2()) and contains(ball, vc.get_bb2()) 
-                if A or B: 
+                if A or B:
                     if ball.z>0.001:
                         r.goto_obj(ball, dt)
                         #проверить достигают ли роботы такого удаления?
@@ -168,9 +170,12 @@ def main():
                     elif r!=robot: 
                         print("stop 1")
                         r.stop()
+                elif mode=="MANUAL" and r==robot:
+                    pass
                 else: 
                     print("stop 2")
                     r.stop()
+                    
         ball.sim(dt)
 
         catch=ball_is_near_player(ball, robots)
