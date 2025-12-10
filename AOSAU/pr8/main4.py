@@ -1,4 +1,7 @@
 
+#TODO: логика движения к упавшему мячу или сброса его положения
+#TODO: понять пч роботы крутятся в углу около виртуальной точки
+
 from select import select
 import sys, pygame
 import numpy as np
@@ -54,11 +57,15 @@ class Ball:
         self.vlin=0
         self.a=0
         self.owner=None
+        self.just_catched=False
+        self.just_thrown=False
+        self.team_id=0 #0 - слева 1 - справа
     def get_pos(self):
         return [self.x, self.y]
     def draw(self, screen):
         pygame.draw.circle(screen, self.color, 
         self.get_pos(), self.radius+self.z/3, 2)
+        drawText(screen, f"{self.team_id}", self.x, self.y)
     def sim(self, dt):
         s,c=math.sin(self.a), math.cos(self.a)
         if self.z>1:
@@ -75,6 +82,7 @@ class Robot:
         self.vlin, self.vrot=0,0
         self.attached_obj=None
         self.vlin_desired=10
+        self.team_id=0 #0 - слева 1 - справа
     def get_pos(self):
         return [self.x, self.y]
     def draw(self, screen):
@@ -84,21 +92,39 @@ class Robot:
         pygame.draw.line(screen, (200,200,200), (self.x0, self.y0), p1, 1)
         s,c=math.sin(self.a), math.cos(self.a)
         pygame.draw.line(screen, self.color, p1, p1+[self.radius*c, self.radius*s],2)
-    def sim(self, dt):
+    def sim(self, vc, dt):
         s,c=math.sin(self.a), math.cos(self.a)
         self.x+=c*self.vlin*dt; self.y+=s*self.vlin*dt; self.a+=self.vrot*dt
         if self.attached_obj: self.attached_obj.x, self.attached_obj.y = self.x, self.y
+        self.team_id = 0 if contains(self, vc.get_bb1()) else 1
     def catches_obj(self, obj):
         return dist(obj.get_pos(), self.get_pos())<self.radius
     def goto_pos(self, pos, dt):
-        x, y=pos
-        dx, dy = x-self.x, y-self.y
+        dx, dy = pos[0]-self.x, pos[1]-self.y
         gamma=math.atan2(dy, dx)
         da=limAng(gamma-self.a)
         self.a+=2*da*dt
         self.vlin=self.vlin_desired
         if (dx*dx + dy*dy)**0.5<self.radius:
             self.vlin=0
+    def throw_ball(self, pos, dt):
+        dx, dy = pos[0]-self.x, pos[1]-self.y
+        gamma=math.atan2(dy, dx)
+        da=limAng(gamma-self.a)
+        self.a+=2*da*dt
+        self.vlin=0
+        if abs(da)<0.1:
+            self.attached_obj.vlin=50+np.random.normal(0, 20)
+            self.attached_obj.vz=20
+            self.attached_obj.z=1
+            self.attached_obj.team_id = self.team_id
+            self.attached_obj.a=self.a
+            self.attached_obj.owner=self #запоминаем, кто бросил мяч
+            self.attached_obj.just_catched = False
+            self.attached_obj=None
+            return True
+        return False
+
     def goto_obj(self, obj, dt):
         self.goto_pos(obj.get_pos(), dt)
     def stop(self):
@@ -132,6 +158,16 @@ def set_robot_velocities(robots, ball):
         else:
             d=max(10, dist(r.get_pos(), ball.get_pos()))
             r.vlin_desired=min(50, 1000*d_hit/d/d*v0)
+
+def try_catch_ball(robots, ball):
+    for r in robots:
+        if ball.owner!=r and ball.z>0 and ball.team_id!=r.team_id and not ball.just_thrown:
+            if r.catches_obj(ball):
+                r.attached_obj=ball
+                ball.owner=r
+                ball.z=1
+                ball.just_catched=True
+                break
 
 def main():
     screen = pygame.display.set_mode(sz)
@@ -168,6 +204,7 @@ def main():
                     if robot.attached_obj:
                         robot.attached_obj.vlin=50
                         robot.attached_obj.vz=20
+                        robot.attached_obj.z=1
                         robot.attached_obj.a=robot.a
                         robot.attached_obj.owner=robot #запоминаем, кто бросил мяч
                         robot.attached_obj=None
@@ -181,28 +218,38 @@ def main():
 
         dt=1/fps
         set_robot_velocities(robots, ball)
+        
         for r in robots: 
-            if not r.attached_obj:
-                A = contains(r, vc.get_bb1()) and contains(ball, vc.get_bb1()) 
-                B = contains(r, vc.get_bb2()) and contains(ball, vc.get_bb2()) 
-
+            A = contains(r, vc.get_bb1()) and contains(ball, vc.get_bb1()) #робот на левом поле вблизи мяча
+            B = contains(r, vc.get_bb2()) and contains(ball, vc.get_bb2()) #робот на правом поле вблизи мяча
+            if mode=="MANUAL" and r==robot:
+                pass
+            elif ball.just_catched and r.attached_obj == ball: # БРОСАЕМ МЯЧ
+                r.stop()
+                if r.throw_ball((200,300) if B else (600,300), dt):
+                    ball.just_thrown=True
+            elif not r.attached_obj: 
                 if ball.owner==r and r.attached_obj is None:
-                    r.goto_pos((r.x0, r.y0), dt)
+                    r.goto_pos((r.x0, r.y0), dt) # БЕЖИМ НА ПОЗИЦИЮ
                 elif A or B:
                     if ball.z>0.001:
-                        r.goto_obj(ball, dt)
+                        r.goto_obj(ball, dt) # БЕЖИМ К МЯЧУ
                         #проверить достигают ли роботы такого удаления?
                         if dist(r.get_pos(), (r.x0, r.y0))>200: 
                            r.goto_pos((r.x0, r.y0), dt) 
                     elif r!=robot: 
                         r.stop()
-                elif mode=="MANUAL" and r==robot:
-                    pass
+               
                 else: 
                     r.stop()
-            r.sim(dt)
+            r.sim(vc, dt)
+
+        print(ball.just_thrown)
+        
+        try_catch_ball(robots, ball) # ЛОВИМ МЯЧ
         
         ball.sim(dt)
+        ball.just_thrown=False
 
         catch=ball_is_near_player(ball, robots)
         if game_started and ball.z<1 and not catch:
