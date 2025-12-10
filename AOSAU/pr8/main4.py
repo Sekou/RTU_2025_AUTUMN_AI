@@ -53,6 +53,7 @@ class Ball:
         self.z, self.vz=0,0
         self.vlin=0
         self.a=0
+        self.owner=None
     def get_pos(self):
         return [self.x, self.y]
     def draw(self, screen):
@@ -73,11 +74,14 @@ class Robot:
         self.x0, self.y0=x,y
         self.vlin, self.vrot=0,0
         self.attached_obj=None
+        self.vlin_desired=10
     def get_pos(self):
         return [self.x, self.y]
     def draw(self, screen):
         p1=np.array(self.get_pos())
         pygame.draw.circle(screen, self.color, p1, self.radius, 2)
+        pygame.draw.circle(screen, self.color, (self.x0, self.y0), self.radius/4, 2)
+        pygame.draw.line(screen, (200,200,200), (self.x0, self.y0), p1, 1)
         s,c=math.sin(self.a), math.cos(self.a)
         pygame.draw.line(screen, self.color, p1, p1+[self.radius*c, self.radius*s],2)
     def sim(self, dt):
@@ -91,8 +95,10 @@ class Robot:
         dx, dy = x-self.x, y-self.y
         gamma=math.atan2(dy, dx)
         da=limAng(gamma-self.a)
-        self.a+=0.5*da*dt
-        self.vlin=10
+        self.a+=2*da*dt
+        self.vlin=self.vlin_desired
+        if (dx*dx + dy*dy)**0.5<self.radius:
+            self.vlin=0
     def goto_obj(self, obj, dt):
         self.goto_pos(obj.get_pos(), dt)
     def stop(self):
@@ -106,20 +112,35 @@ def show_color(obj, vc):
 def ball_is_near_player(ball, robots):
     return any([r.catches_obj(ball) for r in robots])
 
-def create_left_team():
+def create_team(is_left):
+    xshift, k, ang = (0, 1, 0) if is_left else (800, -1, math.pi)
     res=[]
     pp=[[100, 500], [350, 500], [350, 300], 
     [350, 100], [100, 100], [200,300]]
-    for p in pp:
-        res.append(Robot(*p))
+    for x,y in pp:
+        r=Robot(xshift+k*x, y)
+        r.a=ang
+        res.append(r)
     return res
+
+def set_robot_velocities(robots, ball):
+    v0, d_hit = 100, 10
+    for r in robots:
+        if ball.owner==r: 
+            r.vlin=30
+            r.vlin_desired=30
+        else:
+            d=max(10, dist(r.get_pos(), ball.get_pos()))
+            r.vlin_desired=min(50, 1000*d_hit/d/d*v0)
 
 def main():
     screen = pygame.display.set_mode(sz)
     timer = pygame.time.Clock()
     fps = 20
     #robots =[Robot(300, 200), Robot(500, 400)]
-    robots=create_left_team()
+    robots1=create_team(True)
+    robots2=create_team(False)
+    robots=robots1+robots2
     ind_robot=0
     score1=0 #очки первой команды
     score2=0 #очки второй команды
@@ -128,6 +149,8 @@ def main():
 
     vc = VolleyballCourt(20, 20, sz[0]-40, sz[1]-40)
     ball = Ball(300, 400)
+
+    mode = "MANUAL"
 
     while True:
         robot=robots[ind_robot]
@@ -146,6 +169,7 @@ def main():
                         robot.attached_obj.vlin=50
                         robot.attached_obj.vz=20
                         robot.attached_obj.a=robot.a
+                        robot.attached_obj.owner=robot #запоминаем, кто бросил мяч
                         robot.attached_obj=None
                         game_started=True
                     mode = "AUTO"
@@ -156,26 +180,28 @@ def main():
                 if ev.key == pygame.K_2: ind_robot=1
 
         dt=1/fps
+        set_robot_velocities(robots, ball)
         for r in robots: 
-            r.sim(dt)
             if not r.attached_obj:
                 A = contains(r, vc.get_bb1()) and contains(ball, vc.get_bb1()) 
                 B = contains(r, vc.get_bb2()) and contains(ball, vc.get_bb2()) 
-                if A or B:
+
+                if ball.owner==r and r.attached_obj is None:
+                    r.goto_pos((r.x0, r.y0), dt)
+                elif A or B:
                     if ball.z>0.001:
                         r.goto_obj(ball, dt)
                         #проверить достигают ли роботы такого удаления?
-                        if dist(r.get_pos(), (r.x0, r.y0))>2: 
+                        if dist(r.get_pos(), (r.x0, r.y0))>200: 
                            r.goto_pos((r.x0, r.y0), dt) 
                     elif r!=robot: 
-                        print("stop 1")
                         r.stop()
                 elif mode=="MANUAL" and r==robot:
                     pass
                 else: 
-                    print("stop 2")
                     r.stop()
-                    
+            r.sim(dt)
+        
         ball.sim(dt)
 
         catch=ball_is_near_player(ball, robots)
@@ -187,7 +213,8 @@ def main():
                 score1+=1
                 last_loose=2
 
-        for o in [robot, ball]: show_color(o, vc)
+        for r in robots: show_color(r, vc)
+        ball.color=(0,255,0)
 
         screen.fill((255, 255, 255))
         vc.draw(screen)
