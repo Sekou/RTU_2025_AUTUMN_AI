@@ -62,8 +62,7 @@ def main():
                     ang = np.mean(aa)
                     print(ang)
                     #pts2=rot_arr(pts2, ang)
-                    pts2=rot_arr_around(pts2, -ang, c2)
-                    
+                    pts2=rot_arr_around(pts2, -ang, c2)                    
 
         screen.fill((255, 255, 255))     
 
